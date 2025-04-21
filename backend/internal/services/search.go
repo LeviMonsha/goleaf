@@ -1,64 +1,56 @@
-package routes
+package services
 
 import (
 	"encoding/json"
 	"fmt"
+	"goleaf/internal/config"
 	"goleaf/internal/models"
 	"math"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
-var (
-	apiKey string
-)
-
-func SetAPIKey(key string) {
-	apiKey = key
-}
-
-func SearchHandler(w http.ResponseWriter, r *http.Request) {
-	params := r.URL.Query()
-	searchKey := params.Get("q")
+func SearchHandler(c *gin.Context) {
+	searchKey := c.Query("q")
 	if searchKey == "" {
-		http.Error(w, "Missing search query parameter 'q'", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing search query parameter 'q'"})
 		return
 	}
 
-	pageStr := params.Get("page")
-	if pageStr == "" {
-		pageStr = "1"
-	}
+	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
-		http.Error(w, "Invalid page parameter", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page parameter"})
 		return
 	}
 
 	pageSize := 20
-
+	apiKey := config.ApiKey
 	endpoint := fmt.Sprintf(
 		"https://newsapi.org/v2/everything?q=%s&pageSize=%d&page=%d&apiKey=%s&sortBy=publishedAt&language=en",
 		url.QueryEscape(searchKey), pageSize, page, apiKey,
 	)
+	print(endpoint)
 
 	resp, err := http.Get(endpoint)
 	if err != nil {
-		http.Error(w, "Failed to fetch news data", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news data"})
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, "News API returned error", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "News API returned error"})
 		return
 	}
 
 	var results models.Results
 	err = json.NewDecoder(resp.Body).Decode(&results)
 	if err != nil {
-		http.Error(w, "Failed to decode news data", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode news data"})
 		return
 	}
 
@@ -71,10 +63,5 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		Results:    results,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(search)
-	if err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	c.JSON(http.StatusOK, search)
 }

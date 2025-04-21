@@ -1,8 +1,8 @@
 package models
 
 type Search struct {
-	SearchKey  string
-	NextPage   int
-	TotalPages int
-	Results    Results
+	SearchKey  string  `json:"searchKey"`
+	NextPage   int     `json:"nextPage"`
+	TotalPages int     `json:"totalPages"`
+	Results    Results `json:"results"`
 }
